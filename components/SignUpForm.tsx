@@ -5,15 +5,19 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { useSignUp } from "@clerk/nextjs";
 import { z } from "zod";
-
 import { signUpSchema } from "@/schemas/signUpSchema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { set } from "zod/v4";
 
 export default function SignUpForm() {
+  const router = useRouter(); // the router from nextjs
   const [verifying, setVerifying] = useState(false); // the state of the form verifying
   const [isSubmitting, setIsSubmitting] = useState(false); // the state of the form submitting
+  const [verificationCode, setVerificationCode] = useState(""); // the state of the form verification code
   const [authError, setAuthError] = useState<string | null>(null); // it can be null or string
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null
+  ); // it can be null or string
   const { signUp, isLoaded, setActive } = useSignUp(); // the signUp function from Clerk
 
   // Kind of easy
@@ -56,7 +60,27 @@ export default function SignUpForm() {
     }
   };
 
-  const handleVerificationSubmit = async () => {};
+  const handleVerificationSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    if (!isLoaded || !signUp) return;
+    setIsSubmitting(true);
+    setAuthError(null);
+    try {
+      const result = await signUp.attemptEmailAddressVerification({
+        code: verificationCode,
+      });
+
+      if (result.status === "complete") {
+        await setActive({ session: result.createdSessionId });
+        router.push("/dashboard"); // redirect to the dashboard page
+      } else {
+        console.error("Verification Error:", result);
+        setVerifying(false); // set the state of the form to not verifying because there is an error
+      }
+    } catch (error: any) {}
+  };
 
   if (verifying) {
     return <h1>This is OTP entering field</h1>;
