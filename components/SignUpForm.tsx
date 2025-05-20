@@ -291,6 +291,9 @@ export default function SignUpForm() {
             </div>
           </div>
 
+          {/* Add Clerk CAPTCHA element */}
+          <div id="clerk-captcha" className="w-full" />
+
           <Button
             type="submit"
             color="primary"
