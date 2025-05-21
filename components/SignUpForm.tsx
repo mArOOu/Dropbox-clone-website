@@ -1,6 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useSignUp } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { z } from "zod";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Card, CardBody, CardHeader, CardFooter } from "@heroui/card";
@@ -13,32 +19,24 @@ import {
   Eye,
   EyeOff,
 } from "lucide-react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { useSignUp } from "@clerk/nextjs";
-import { z } from "zod";
 import { signUpSchema } from "@/schemas/signUpSchema";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { set } from "zod/v4";
 
 export default function SignUpForm() {
-  const router = useRouter(); // the router from nextjs
-  const [verifying, setVerifying] = useState(false); // the state of the form verifying
-  const [isSubmitting, setIsSubmitting] = useState(false); // the state of the form submitting
-  const [verificationCode, setVerificationCode] = useState(""); // the state of the form verification code
-  const [authError, setAuthError] = useState<string | null>(null); // it can be null or string
+  const router = useRouter();
+  const { signUp, isLoaded, setActive } = useSignUp();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
   const [verificationError, setVerificationError] = useState<string | null>(
     null
-  ); // it can be null or string
-  const { signUp, isLoaded, setActive } = useSignUp(); // the signUp function from Clerk
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Kind of easy
   const {
-    register, // Collects the input values from the form
-    handleSubmit, // Handles the form submission
+    register,
+    handleSubmit,
     formState: { errors },
   } = useForm<z.infer<typeof signUpSchema>>({
     resolver: zodResolver(signUpSchema),
@@ -51,27 +49,26 @@ export default function SignUpForm() {
 
   const onSubmit = async (data: z.infer<typeof signUpSchema>) => {
     if (!isLoaded) return;
-    setIsSubmitting(true); // set the state of the form to submitting if it is loaded
-    setAuthError(null); // set the state of the form to null if it is loading
+
+    setIsSubmitting(true);
+    setAuthError(null);
 
     try {
       await signUp.create({
-        emailAddress: data.email, // the email address from the form
-        password: data.password, // the password from the form
-      });
-      await signUp.prepareEmailAddressVerification({
-        strategy: "email_code",
+        emailAddress: data.email,
+        password: data.password,
       });
 
-      setVerifying(true); // set the state of the form to verifying because the email is sent
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setVerifying(true);
     } catch (error: any) {
-      console.error("SignUp Error:", error);
+      console.error("Sign-up error:", error);
       setAuthError(
         error.errors?.[0]?.message ||
-          "An error occured during the signup. Please try again"
-      ); // set the state of the form to the error message
+          "An error occurred during sign-up. Please try again."
+      );
     } finally {
-      setIsSubmitting(false); // set the state of the form to not submitting because it already submitted
+      setIsSubmitting(false);
     }
   };
 
@@ -80,8 +77,10 @@ export default function SignUpForm() {
   ) => {
     e.preventDefault();
     if (!isLoaded || !signUp) return;
+
     setIsSubmitting(true);
-    setAuthError(null);
+    setVerificationError(null);
+
     try {
       const result = await signUp.attemptEmailAddressVerification({
         code: verificationCode,
@@ -89,15 +88,15 @@ export default function SignUpForm() {
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
-        router.push("/dashboard"); // redirect to the dashboard page
+        router.push("/dashboard");
       } else {
-        console.error("Verification Error:", result);
+        console.error("Verification incomplete:", result);
         setVerificationError(
-          "Verification failed. Please check your code and try again."
-        ); // set the state of the form to not verifying because there is an error
+          "Verification could not be completed. Please try again."
+        );
       }
     } catch (error: any) {
-      console.error("Verification Error:", error);
+      console.error("Verification error:", error);
       setVerificationError(
         error.errors?.[0]?.message ||
           "An error occurred during verification. Please try again."
@@ -129,7 +128,7 @@ export default function SignUpForm() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleVerificationSubmit} className="space-y-6">
             <div className="space-y-2">
               <label
                 htmlFor="verificationCode"
@@ -217,17 +216,19 @@ export default function SignUpForm() {
             />
           </div>
 
+          {/* Password Input Field */}
           <div className="space-y-2">
             <label
               htmlFor="password"
               className="text-sm font-medium text-default-900">
               Password
             </label>
+            {/* Password input with toggle visibility button */}
             <Input
               id="password"
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? "text" : "password"} // Toggle between text/password
               placeholder="••••••••"
-              startContent={<Lock className="h-4 w-4 text-default-500" />}
+              startContent={<Lock className="h-4 w-4 text-default-500" />} // Lock icon at start
               endContent={
                 <Button
                   isIconOnly
@@ -236,31 +237,34 @@ export default function SignUpForm() {
                   onClick={() => setShowPassword(!showPassword)}
                   type="button">
                   {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-default-500" />
+                    <EyeOff className="h-4 w-4 text-default-500" /> // Show when password is visible
                   ) : (
-                    <Eye className="h-4 w-4 text-default-500" />
+                    <Eye className="h-4 w-4 text-default-500" /> // Show when password is hidden
                   )}
                 </Button>
               }
-              isInvalid={!!errors.password}
-              errorMessage={errors.password?.message}
-              {...register("password")}
+              isInvalid={!!errors.password} // Show error state if validation fails
+              errorMessage={errors.password?.message} // Display validation error message
+              {...register("password")} // Register field with React Hook Form
               className="w-full"
             />
           </div>
 
+          {/* Password Confirmation Input Field */}
           <div className="space-y-2">
             <label
               htmlFor="passwordConfirmation"
               className="text-sm font-medium text-default-900">
               Confirm Password
             </label>
+            {/* Confirmation password input with similar visibility toggle */}
             <Input
               id="passwordConfirmation"
               type={showConfirmPassword ? "text" : "password"}
               placeholder="••••••••"
               startContent={<Lock className="h-4 w-4 text-default-500" />}
               endContent={
+                // Toggle confirmation password visibility button
                 <Button
                   isIconOnly
                   variant="light"
@@ -274,9 +278,9 @@ export default function SignUpForm() {
                   )}
                 </Button>
               }
-              isInvalid={!!errors.passwordConfirmation}
+              isInvalid={!!errors.passwordConfirmation} // Show error if passwords don't match
               errorMessage={errors.passwordConfirmation?.message}
-              {...register("passwordConfirmation")}
+              {...register("passwordConfirmation")} // Register confirmation field
               className="w-full"
             />
           </div>
@@ -290,9 +294,6 @@ export default function SignUpForm() {
               </p>
             </div>
           </div>
-
-          {/* Add Clerk CAPTCHA element */}
-          <div id="clerk-captcha" className="w-full" />
 
           <Button
             type="submit"
